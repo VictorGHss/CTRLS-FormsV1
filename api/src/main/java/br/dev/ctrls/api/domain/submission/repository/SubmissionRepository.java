@@ -11,14 +11,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /**
- * Repositório de submissões para consultas e sincronizações.
+ * Repositório de submissões.
  */
 public interface SubmissionRepository extends JpaRepository<Submission, UUID> {
 
+    // EntityGraph carrega o template+clínica junto para evitar N+1 queries
     @EntityGraph(attributePaths = {"template", "template.clinic", "template.doctor"})
     @Query("SELECT s FROM Submission s WHERE (:clinicId IS NULL OR s.template.clinic.id = :clinicId) " +
-            "AND (:status IS NULL OR s.status = :status) " +
-            "AND (:patientName IS NULL OR LOWER(s.patientName) LIKE LOWER(CONCAT('%', :patientName, '%')))")
+            "AND (:status IS NULL OR s.status = :status)")
     Page<Submission> searchWithFilters(@Param("clinicId") UUID clinicId,
                                        @Param("status") SubmissionStatus status,
                                        @Param("patientName") String patientName,

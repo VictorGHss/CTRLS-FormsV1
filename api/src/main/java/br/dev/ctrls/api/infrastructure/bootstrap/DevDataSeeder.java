@@ -9,13 +9,14 @@ import br.dev.ctrls.api.domain.user.Doctor;
 import br.dev.ctrls.api.domain.user.User;
 import br.dev.ctrls.api.domain.user.UserRole;
 import br.dev.ctrls.api.domain.user.repository.UserRepository;
-import java.util.HashSet;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+
+import java.util.HashSet;
+import java.util.UUID;
 
 /**
  * Cria dados básicos para desenvolvimento local.
@@ -73,7 +74,7 @@ public class DevDataSeeder implements CommandLineRunner {
         FormTemplate template = FormTemplate.builder()
                 .title("Anamnese Geral")
                 .description("Coleta padrão de informações clínicas")
-                .schemaJson("{}")
+                .schemaJson("[{\"id\":\"q1\",\"type\":\"text\",\"label\":\"Queixa Principal\",\"required\":true}]")
                 .publicUuid(UUID.randomUUID())
                 .active(true)
                 .clinic(clinic)

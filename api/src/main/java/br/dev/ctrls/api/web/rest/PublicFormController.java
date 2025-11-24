@@ -6,44 +6,38 @@ import br.dev.ctrls.api.domain.form.repository.FormTemplateRepository;
 import br.dev.ctrls.api.web.dto.FormPublicViewDTO;
 import br.dev.ctrls.api.web.dto.SubmissionRequest;
 import br.dev.ctrls.api.web.dto.SubmissionResponse;
-import java.util.UUID;
-import org.springframework.cache.annotation.Cacheable;
+import io.swagger.v3.oas.annotations.Operation;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-/**
- * Endpoints públicos para renderização e submissão de formulários.
- */
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/public/forms")
+@RequiredArgsConstructor
 public class PublicFormController {
 
     private final FormTemplateRepository formTemplateRepository;
     private final SubmissionService submissionService;
 
-    public PublicFormController(FormTemplateRepository formTemplateRepository,
-                                SubmissionService submissionService) {
-        this.formTemplateRepository = formTemplateRepository;
-        this.submissionService = submissionService;
-    }
-
     @GetMapping("/{uuid}")
-    @Cacheable(value = "forms", key = "#uuid")
+    @Operation(summary = "Obter template público de formulário")
     public ResponseEntity<FormPublicViewDTO> getForm(@PathVariable UUID uuid) {
+        // Busca no banco
         FormTemplate template = formTemplateRepository.findByPublicUuid(uuid)
                 .orElseThrow(() -> new IllegalArgumentException("Formulário não encontrado"));
-        return ResponseEntity.ok(FormPublicViewDTO.from(template));
+
+        // Converte para DTO preenchendo o Branding
+        return ResponseEntity.ok(FormPublicViewDTO.fromEntity(template));
     }
 
     @PostMapping("/{uuid}/submit")
-    public ResponseEntity<SubmissionResponse> submit(@PathVariable UUID uuid,
-                                                     @RequestBody SubmissionRequest request) {
-        SubmissionResponse response = submissionService.processSubmission(uuid, request);
-        return ResponseEntity.ok(response);
+    @Operation(summary = "Enviar resposta do formulário")
+    public ResponseEntity<SubmissionResponse> submit(
+            @PathVariable UUID uuid,
+            @RequestBody SubmissionRequest request) {
+
+        return ResponseEntity.ok(submissionService.processSubmission(uuid, request));
     }
 }

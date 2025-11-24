@@ -40,7 +40,11 @@ build/
 ### Logs ###
 *.log
 log_*.txt*
+log_erro.txtcd
 logs/
+
+### Build Artifacts ###
+*.jar
 
 ### Database ###
 *.db
@@ -49,4 +53,3 @@ logs/
 ### OS ###
 .DS_Store
 Thumbs.db
-

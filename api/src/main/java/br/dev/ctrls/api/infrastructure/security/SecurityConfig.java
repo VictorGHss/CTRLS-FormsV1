@@ -20,17 +20,18 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
-/**
- * Configuração de segurança stateless com CORS e filtros customizados.
- */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     private final TenantContextFilter tenantContextFilter;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter; // <--- NOVO
 
-    public SecurityConfig(TenantContextFilter tenantContextFilter) {
+    // Injeta os dois filtros
+    public SecurityConfig(TenantContextFilter tenantContextFilter,
+                          JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.tenantContextFilter = tenantContextFilter;
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
 
     @Bean
@@ -44,7 +45,13 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated())
-                .addFilterBefore(tenantContextFilter, UsernamePasswordAuthenticationFilter.class);
+
+                // A ORDEM IMPORTA MUITO AQUI:
+                // 1. Valida o Token JWT
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                // 2. Valida a Clínica (depois que já sabemos quem é o usuário)
+                .addFilterAfter(tenantContextFilter, JwtAuthenticationFilter.class);
+
         return http.build();
     }
 

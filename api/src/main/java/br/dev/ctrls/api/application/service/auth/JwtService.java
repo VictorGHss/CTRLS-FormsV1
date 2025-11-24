@@ -8,16 +8,15 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.stereotype.Service;
+
 import java.security.Key;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
-import java.util.UUID;
-import org.springframework.stereotype.Service;
+import java.util.function.Function;
 
-/**
- * Serviço responsável por gerar e validar JWTs multi-tenant.
- */
 @Service
 public class JwtService {
 
@@ -45,22 +44,43 @@ public class JwtService {
                 .compact();
     }
 
-    public boolean validateToken(String token) {
+    public boolean isTokenValid(String token) {
         try {
-            Jwts.parserBuilder().setSigningKey(signingKey).build().parseClaimsJws(token);
-            return true;
+            return !isTokenExpired(token);
         } catch (Exception ex) {
             return false;
         }
     }
 
-    public UUID extractUserId(String token) {
-        Claims claims = Jwts.parserBuilder().setSigningKey(signingKey).build().parseClaimsJws(token).getBody();
-        return UUID.fromString(claims.getSubject());
+    public String extractUsername(String token) {
+        return extractClaim(token, Claims::getSubject);
     }
 
-    public String extractEmail(String token) {
-        Claims claims = Jwts.parserBuilder().setSigningKey(signingKey).build().parseClaimsJws(token).getBody();
-        return claims.get("email", String.class);
+    public List<String> extractRoles(String token) {
+        final Claims claims = extractAllClaims(token);
+        // O token grava como String única (ex: "DOCTOR"), convertemos para Lista
+        Object roles = claims.get("roles");
+        return roles != null ? List.of(roles.toString()) : List.of();
+    }
+
+    private boolean isTokenExpired(String token) {
+        return extractExpiration(token).before(new Date());
+    }
+
+    private Date extractExpiration(String token) {
+        return extractClaim(token, Claims::getExpiration);
+    }
+
+    private <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+        final Claims claims = extractAllClaims(token);
+        return claimsResolver.apply(claims);
+    }
+
+    private Claims extractAllClaims(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(signingKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
     }
 }
