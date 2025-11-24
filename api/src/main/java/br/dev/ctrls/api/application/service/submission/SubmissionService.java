@@ -1,10 +1,6 @@
 package br.dev.ctrls.api.application.service.submission;
 
-import br.dev.ctrls.api.application.service.document.PdfService;
-import br.dev.ctrls.api.client.feegow.FeegowClient;
-import br.dev.ctrls.api.client.feegow.dto.FeegowPatientRequest;
-import br.dev.ctrls.api.client.feegow.dto.FeegowPatientResponse;
-import br.dev.ctrls.api.client.feegow.dto.UploadFileRequest;
+import br.dev.ctrls.api.application.event.SubmissionCreatedEvent;
 import br.dev.ctrls.api.domain.form.FormTemplate;
 import br.dev.ctrls.api.domain.form.repository.FormTemplateRepository;
 import br.dev.ctrls.api.domain.submission.Submission;
@@ -13,14 +9,22 @@ import br.dev.ctrls.api.domain.submission.repository.SubmissionRepository;
 import br.dev.ctrls.api.web.dto.SubmissionRequest;
 import br.dev.ctrls.api.web.dto.SubmissionResponse;
 import jakarta.persistence.EntityNotFoundException;
-import java.time.Instant;
-import java.util.Base64;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Serviço para gerenciar submissões de formulários.
+ *
+ * ARQUITETURA:
+ * - Método síncrono (submitForm): valida e salva submissão com status PENDING
+ * - Retorna imediatamente ao cliente (resposta rápida)
+ * - Publica evento para processamento assíncrono
+ * - SubmissionEventHandler processa integração Feegow em background
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -28,11 +32,25 @@ public class SubmissionService {
 
     private final FormTemplateRepository templateRepository;
     private final SubmissionRepository submissionRepository;
-    private final FeegowClient feegowClient;
-    private final PdfService pdfService;
+    private final ApplicationEventPublisher eventPublisher;
 
+    /**
+     * Recebe submissão do formulário e agenda processamento assíncrono.
+     *
+     * IMPORTANTE:
+     * - Esta transação é RÁPIDA (apenas validação + insert)
+     * - NÃO faz chamadas HTTP nem geração de PDF
+     * - Libera conexão do pool imediatamente
+     *
+     * @param formUuid UUID público do formulário
+     * @param request Dados da submissão
+     * @return Resposta com ID e status PENDING
+     */
     @Transactional
-    public SubmissionResponse processSubmission(UUID formUuid, SubmissionRequest request) {
+    public SubmissionResponse submitForm(UUID formUuid, SubmissionRequest request) {
+        log.info("Recebendo submissão do formulário: {}", formUuid);
+
+        // 1. Validar formulário (query rápida com @EntityGraph)
         FormTemplate template = templateRepository.findByPublicUuid(formUuid)
                 .orElseThrow(() -> new EntityNotFoundException("Formulário não encontrado"));
 
@@ -40,6 +58,7 @@ public class SubmissionService {
             throw new IllegalStateException("Formulário inativo");
         }
 
+        // 2. Criar submissão com status PENDING
         Submission submission = Submission.builder()
                 .template(template)
                 .patientCpf(request.patient().cpf())
@@ -48,38 +67,27 @@ public class SubmissionService {
                 .status(SubmissionStatus.PENDING)
                 .build();
 
-        String token = template.getClinic().getFeegowApiToken();
+        submission = submissionRepository.save(submission);
 
-        try {
-            Long patientId = resolveFeegowPatient(token, request);
+        // 3. Publicar evento para processamento assíncrono
+        // O SubmissionEventHandler vai processar em background
+        eventPublisher.publishEvent(new SubmissionCreatedEvent(this, submission.getId()));
 
-            byte[] pdfBytes = pdfService.generateAnamnesisPdf(submission, template);
-            String base64 = Base64.getEncoder().encodeToString(pdfBytes);
-            String filename = "anamnese-" + Instant.now().toEpochMilli() + ".pdf";
+        log.info("Submissão criada com sucesso. ID: {} - Status: PENDING", submission.getId());
 
-            UploadFileRequest uploadRequest = new UploadFileRequest(patientId, base64, filename);
-            feegowClient.uploadPatientFile(token, uploadRequest);
-
-            submission.setStatus(SubmissionStatus.PROCESSED);
-            submission.setFeegowPatientId(String.valueOf(patientId));
-        } catch (Exception ex) {
-            log.error("Erro na integração Feegow", ex);
-            submission.setStatus(SubmissionStatus.ERROR);
-        }
-
-        submissionRepository.save(submission);
+        // 4. Retornar resposta imediata ao cliente
         return new SubmissionResponse(submission.getId(), submission.getStatus());
     }
 
-    private Long resolveFeegowPatient(String token, SubmissionRequest request) {
-        FeegowPatientResponse response = feegowClient.listPatients(token, request.patient().cpf());
-        Long existingId = response.firstId();
-
-        if (existingId != null) {
-            return existingId;
-        }
-
-        FeegowPatientRequest createRequest = request.toCreatePatientRequest();
-        return feegowClient.createPatient(token, createRequest);
+    /**
+     * MÉTODO DEPRECADO - Mantido apenas para compatibilidade temporária.
+     * Use submitForm() para o novo fluxo assíncrono.
+     *
+     * @deprecated Usar {@link #submitForm(UUID, SubmissionRequest)} com processamento assíncrono
+     */
+    @Deprecated(since = "2.0", forRemoval = true)
+    public SubmissionResponse processSubmission(UUID formUuid, SubmissionRequest request) {
+        log.warn("Método processSubmission() está deprecated. Use submitForm() para processamento assíncrono.");
+        return submitForm(formUuid, request);
     }
 }
