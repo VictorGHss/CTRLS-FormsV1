@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Temporary documentation files
+project-structure.txt
+CHECKLIST.md
+PHASE1_OUTPUT.md
+

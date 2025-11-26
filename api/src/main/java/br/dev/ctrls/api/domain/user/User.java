@@ -12,11 +12,11 @@ import lombok.experimental.SuperBuilder;
 @Setter
 @SuperBuilder(toBuilder = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor
 @Entity
 @Table(name = "users")
 @Inheritance(strategy = InheritanceType.JOINED)
-@DiscriminatorColumn(name = "user_type")
+@DiscriminatorColumn(name = "user_type", discriminatorType = DiscriminatorType.STRING, length = 20)
+@DiscriminatorValue("USER")
 public class User extends BaseEntity {
 
     @Email

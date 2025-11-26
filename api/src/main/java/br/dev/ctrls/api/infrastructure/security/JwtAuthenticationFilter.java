@@ -5,8 +5,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.util.List;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -15,14 +15,29 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import java.io.IOException;
+import java.util.List;
+
+/**
+ * Filter para autenticação via JWT (JSON Web Token).
+ *
+ * RESPONSABILIDADES:
+ * 1. Extrair token JWT do header Authorization
+ * 2. Validar assinatura e expiração do token
+ * 3. Extrair claims (userId, roles) do token
+ * 4. Criar Authentication no SecurityContext do Spring
+ *
+ * SEGURANÇA:
+ * - Logs sanitizados (sem tokens ou IDs em produção)
+ * - Exceções tratadas adequadamente (delegadas ao FilterExceptionHandler)
+ * - Validação robusta antes de setar autenticação
+ */
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-
-    public JwtAuthenticationFilter(JwtService jwtService) {
-        this.jwtService = jwtService;
-    }
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -31,51 +46,60 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         final String authHeader = request.getHeader("Authorization");
-        final String jwt;
-        final String userId;
 
-        // 1. Verifica se tem header Bearer
+        // 1. Verificar presença do header Bearer
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        jwt = authHeader.substring(7); // Remove "Bearer "
+        final String jwt = authHeader.substring(7); // Remove "Bearer "
 
         try {
-            userId = jwtService.extractUsername(jwt); // O nosso subject é o ID
-
-            // 2. Se tem ID e ainda não está autenticado no contexto
-            if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-
-                if (jwtService.isTokenValid(jwt)) {
-                    // Pega as roles do token
-                    List<String> roles = jwtService.extractRoles(jwt);
-                    var authorities = roles.stream()
-                            .map(role -> new SimpleGrantedAuthority("ROLE_" + role)) // Adiciona prefixo ROLE_
-                            .toList();
-
-                    // Cria o objeto de autenticação do Spring (User ID + Roles)
-                    // Usamos o userId como principal para não precisar ir no banco toda vez
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userId, // Principal (String UUID)
-                            null,   // Credentials
-                            authorities // Authorities
-                    );
-
-                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                    // 3. Loga o usuário no contexto da requisição
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
-
-                    System.out.println("🔑 [JwtFilter] Usuário autenticado via Token: " + userId);
-                }
-            }
-        } catch (Exception e) {
-            System.out.println("⚠️ [JwtFilter] Erro ao validar token: " + e.getMessage());
-            // Não lançamos erro aqui, deixamos seguir para dar 403 lá na frente se necessário
+            authenticateWithJwt(request, jwt);
+        } catch (Exception ex) {
+            // Log do erro SEM expor o token
+            log.warn("⚠️ [JwtFilter] Falha ao processar token JWT: {}", ex.getMessage());
+            // Exceção será capturada pelo FilterExceptionHandler se necessário
+            // Por ora, apenas não autentica o usuário (deixa passar para retornar 401/403)
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Processa autenticação via JWT com validações robustas.
+     */
+    private void authenticateWithJwt(HttpServletRequest request, String jwt) {
+        // Extrair userId do token (claim 'subject')
+        String userId = jwtService.extractUsername(jwt);
+
+        // 2. Validar se token é válido e usuário não está autenticado ainda
+        if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+
+            if (jwtService.isTokenValid(jwt)) {
+                // Extrair roles do token
+                List<String> roles = jwtService.extractRoles(jwt);
+                var authorities = roles.stream()
+                        .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                        .toList();
+
+                // Criar token de autenticação do Spring Security
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                        userId,    // Principal (User ID)
+                        null,      // Credentials (não necessário após autenticação)
+                        authorities // Authorities/Roles
+                );
+
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                // 3. Registrar autenticação no SecurityContext
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+
+                log.debug("✅ [JwtFilter] Usuário autenticado com sucesso");
+            } else {
+                log.debug("⚠️ [JwtFilter] Token inválido ou expirado");
+            }
+        }
     }
 }

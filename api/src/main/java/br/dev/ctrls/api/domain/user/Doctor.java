@@ -2,21 +2,19 @@ package br.dev.ctrls.api.domain.user;
 
 import br.dev.ctrls.api.domain.clinic.Clinic;
 import jakarta.persistence.Column;
+import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import java.util.HashSet;
 import java.util.Set;
-import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
@@ -26,9 +24,9 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @Setter
 @SuperBuilder(toBuilder = true)
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "doctors")
+@DiscriminatorValue("DOCTOR")
 public class Doctor extends User {
 
     @NotBlank
@@ -68,8 +66,11 @@ public class Doctor extends User {
             inverseJoinColumns = @JoinColumn(name = "secretary_id"))
     private Set<br.dev.ctrls.api.domain.secretary.Secretary> secretaries = new HashSet<>();
 
-    @PrePersist
-    void assignRole() {
+    /**
+     * Construtor personalizado para garantir que o role seja sempre DOCTOR.
+     */
+    protected Doctor() {
+        super();
         setRole(UserRole.DOCTOR);
     }
 }

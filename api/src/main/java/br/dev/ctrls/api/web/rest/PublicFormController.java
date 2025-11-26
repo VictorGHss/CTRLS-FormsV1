@@ -20,7 +20,19 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
-@Tag(name = "Formulários Públicos", description = "APIs públicas para acesso e submissão de formulários de anamnese")
+/**
+ * Controller para APIs públicas de formulários (sem autenticação).
+ *
+ * RESPONSABILIDADES:
+ * 1. Fornecer formulário público para preenchimento pelo paciente
+ * 2. Receber submissão do formulário preenchido
+ * 3. Retornar 202 Accepted para processamento assíncrono
+ */
+@Tag(
+    name = "Formulários Públicos",
+    description = "APIs públicas para acesso e submissão de formulários de anamnese. " +
+                  "Não requer autenticação."
+)
 @RestController
 @RequestMapping("/api/public/forms")
 @RequiredArgsConstructor
@@ -33,12 +45,13 @@ public class PublicFormController {
     @Operation(
         summary = "Obter template de formulário público",
         description = "Retorna o template do formulário com informações de branding da clínica e médico. " +
-                      "Este endpoint é público e não requer autenticação."
+                      "Usado pelo frontend para renderizar o formulário de anamnese. " +
+                      "**Endpoint público - não requer autenticação.**"
     )
     @ApiResponses({
         @ApiResponse(
             responseCode = "200",
-            description = "Formulário encontrado com sucesso",
+            description = "Formulário encontrado e retornado com sucesso",
             content = @Content(
                 mediaType = "application/json",
                 schema = @Schema(implementation = FormPublicViewDTO.class)
@@ -62,11 +75,9 @@ public class PublicFormController {
         )
     })
     public ResponseEntity<FormPublicViewDTO> getForm(@PathVariable UUID uuid) {
-        // Busca no banco
         FormTemplate template = formTemplateRepository.findByPublicUuid(uuid)
                 .orElseThrow(() -> new IllegalArgumentException("Formulário não encontrado"));
 
-        // Converte para DTO preenchendo o Branding
         return ResponseEntity.ok(FormPublicViewDTO.fromEntity(template));
     }
 
@@ -74,13 +85,16 @@ public class PublicFormController {
     @Operation(
         summary = "Enviar resposta do formulário (processamento assíncrono)",
         description = "Recebe a submissão do formulário preenchido pelo paciente. " +
-                      "O processamento (integração com Feegow e geração de PDF) é feito de forma assíncrona. " +
-                      "Retorna imediatamente com status PENDING e um ID para acompanhamento."
+                      "**IMPORTANTE:** O processamento é assíncrono - integração com Feegow e geração de PDF " +
+                      "ocorrem em background. Retorna imediatamente com status PENDING e um ID para acompanhamento. " +
+                      "\n\n**Endpoint público - não requer autenticação.**"
     )
     @ApiResponses({
         @ApiResponse(
             responseCode = "202",
-            description = "Submissão aceita para processamento assíncrono",
+            description = "Submissão aceita para processamento assíncrono. " +
+                         "Status inicial: PENDING. Processamento em background incluirá: " +
+                         "validação de paciente no Feegow, geração de PDF e upload de arquivo.",
             content = @Content(
                 mediaType = "application/json",
                 schema = @Schema(implementation = SubmissionResponse.class)
@@ -88,7 +102,8 @@ public class PublicFormController {
         ),
         @ApiResponse(
             responseCode = "400",
-            description = "Dados inválidos - verifique validações de CPF, data, etc",
+            description = "Dados inválidos - verifique validações de CPF (11 dígitos), " +
+                         "data (dd/MM/yyyy), sexo (M/F/Outro), etc.",
             content = @Content(
                 mediaType = "application/problem+json",
                 schema = @Schema(implementation = ProblemDetail.class)
@@ -96,7 +111,7 @@ public class PublicFormController {
         ),
         @ApiResponse(
             responseCode = "404",
-            description = "Formulário não encontrado",
+            description = "Formulário não encontrado com o UUID fornecido",
             content = @Content(
                 mediaType = "application/problem+json",
                 schema = @Schema(implementation = ProblemDetail.class)
@@ -104,7 +119,7 @@ public class PublicFormController {
         ),
         @ApiResponse(
             responseCode = "409",
-            description = "Formulário inativo - não aceita submissões",
+            description = "Formulário inativo - não aceita submissões no momento",
             content = @Content(
                 mediaType = "application/problem+json",
                 schema = @Schema(implementation = ProblemDetail.class)
@@ -117,7 +132,7 @@ public class PublicFormController {
 
         SubmissionResponse response = submissionService.submitForm(uuid, request);
 
-        // Retorna 202 Accepted indicando que o processamento será feito de forma assíncrona
+        // ✅ Retorna 202 Accepted (processamento assíncrono)
         return ResponseEntity.accepted().body(response);
     }
 }

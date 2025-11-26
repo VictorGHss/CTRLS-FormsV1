@@ -4,6 +4,7 @@ import br.dev.ctrls.api.domain.common.BaseEntity;
 import br.dev.ctrls.api.domain.form.FormTemplate;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -13,7 +14,6 @@ import org.hibernate.type.SqlTypes;
 @Setter
 @SuperBuilder(toBuilder = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor
 @Entity
 @Table(name = "submissions")
 public class Submission extends BaseEntity {
@@ -27,6 +27,7 @@ public class Submission extends BaseEntity {
     private String patientName;
 
     @NotBlank
+    @Pattern(regexp = "\\d{11}", message = "CPF deve conter exatamente 11 dígitos numéricos")
     @Column(name = "patient_cpf", nullable = false, length = 11)
     private String patientCpf;
 

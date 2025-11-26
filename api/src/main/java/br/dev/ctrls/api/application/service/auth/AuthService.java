@@ -7,13 +7,13 @@ import br.dev.ctrls.api.domain.clinic.repository.ClinicRepository;
 import br.dev.ctrls.api.domain.user.User;
 import br.dev.ctrls.api.domain.user.repository.UserRepository;
 import java.util.UUID;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 /**
  * Serviço de autenticação com validação de tenant.
+ *
+ * SECURITY: Valida no nível do banco de dados se o usuário pertence à clínica.
  */
 @Service
 public class AuthService {
@@ -33,19 +33,41 @@ public class AuthService {
         this.jwtService = jwtService;
     }
 
+    /**
+     * Autentica um usuário e gera token JWT com contexto de tenant (clínica).
+     *
+     * VALIDAÇÕES:
+     * 1. Usuário existe e credenciais são válidas
+     * 2. Clínica existe
+     * 3. Usuário tem permissão para acessar a clínica (validado no DB)
+     *
+     * @param request Dados de login (email, senha, clinicId)
+     * @return Token JWT com claims de usuário e tenant
+     * @throws IllegalArgumentException se credenciais inválidas ou usuário não autorizado
+     */
     public LoginResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new IllegalArgumentException("Usuário inválido"));
+        UUID clinicId = UUID.fromString(request.clinicId());
 
+        // Validar existência da clínica primeiro
+        Clinic clinic = clinicRepository.findById(clinicId)
+                .orElseThrow(() -> new IllegalArgumentException("Clínica não encontrada"));
+
+        // Buscar usuário COM validação de vínculo à clínica (query otimizada)
+        User user = userRepository.findByEmailAndClinicId(request.email(), clinicId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                    "Credenciais inválidas ou usuário não autorizado para esta clínica"
+                ));
+
+        // Validar senha
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new IllegalArgumentException("Credenciais inválidas");
         }
 
-        Clinic clinic = clinicRepository.findById(UUID.fromString(request.clinicId()))
-                .orElseThrow(() -> new IllegalArgumentException("Clínica não encontrada"));
-
+        // Gerar token com contexto de tenant
         String token = jwtService.generateToken(user, clinic);
         return new LoginResponse(token);
     }
 }
+
+
 

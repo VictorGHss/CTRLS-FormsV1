@@ -1,0 +1,62 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation (don't include in Docker image)
+*.md
+*.MD
+HELP.md
+
+# Deployment Scripts
+*.ps1
+*.sh
+docker-compose.yml
+
+# Logs
+*.log
+logs/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Environment (use secrets management instead)
+.env
+.env.*
+
+# Test resources
+**/src/test/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Test resources (already excluded by multi-stage build)
+src/test/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+

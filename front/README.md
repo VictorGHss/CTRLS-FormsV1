@@ -1,127 +1,175 @@
 # CTRLS-Forms Frontend
 
-Multi-tenant medical SaaS for form submissions with patient interface and doctor dashboard.
+Multi-tenant medical SaaS platform for form submissions with patient interface and doctor dashboard.
 
 ## 🚀 Tech Stack
 
-- **Framework**: React 18 + Vite + TypeScript
+- **Framework**: React + Vite + TypeScript
 - **Styling**: Tailwind CSS + Shadcn/UI
-- **State Management**: TanStack Query (React Query) v5
+- **State**: TanStack Query (React Query) v5
 - **Routing**: React Router DOM v6
-- **HTTP Client**: Axios
+- **HTTP**: Axios
 - **Icons**: Lucide React
+- **Deploy**: Docker + Nginx + GCP Cloud Run
+
+---
 
 ## 📁 Project Structure
 
 ```
 src/
-├── components/
-│   └── ui/              # Reusable UI components (Shadcn-style)
+├── components/ui/       # Reusable UI components (Button, Card, Input, Badge)
 ├── features/
-│   ├── auth/            # Login page
-│   ├── dashboard/       # Doctor dashboard (protected)
-│   └── public-form/     # Patient form submission (public)
+│   ├── auth/           # Login page
+│   ├── dashboard/      # Doctor dashboard (protected)
+│   └── public-form/    # Patient form submission (public)
 ├── lib/
-│   ├── axios.ts         # API client with interceptors
-│   └── utils.ts         # Utility functions
+│   ├── axios.ts        # API client with auth interceptors
+│   └── utils.ts        # Utility functions (cn, hexToHSL, formatters)
 ├── services/
-│   └── api.service.ts   # API endpoints
-├── types/
-│   └── api.ts           # TypeScript interfaces
-├── App.tsx              # Main app with routing
-├── main.tsx             # Entry point
-└── style.css            # Tailwind imports & CSS variables
+│   └── api.service.ts  # API endpoints
+└── types/
+    └── api.ts          # TypeScript interfaces
 ```
 
-## 🔧 Installation & Setup
+---
 
-### 1. Install Dependencies
+## 🔧 Quick Start
+
+### Prerequisites
+
+- Node.js 18+
+- Backend API running on `http://localhost:8080`
+
+### Installation
 
 ```bash
+# Install dependencies
 npm install
-```
 
-### 2. Start Development Server
+# (Optional) Configure environment
+cp .env.example .env.local
 
-```bash
+# Start development server
 npm run dev
 ```
 
-The app will run on **http://localhost:3000**
+The app runs on **http://localhost:5173**
 
-### 3. Build for Production
+### Build
 
 ```bash
 npm run build
 ```
 
+---
+
 ## 🌐 API Integration
 
-### Backend URL
-- **Base URL**: `http://localhost:8080`
-- Make sure the backend is running before starting the frontend
+### Backend Configuration
 
-### Critical Headers
+- **Base URL**: `http://localhost:8080` (development)
+- **Production**: Set via `VITE_API_BASE_URL` environment variable
 
-All protected requests MUST include:
+### Authentication Headers
+
+All protected requests include:
 - `Authorization: Bearer <token>`
-- `X-Clinic-ID: <clinic_uuid>`
+- `X-Clinic-ID: <clinic_uuid>` ⚠️ **Critical for multi-tenancy**
 
-These headers are automatically added by the Axios interceptor in `src/lib/axios.ts`.
+Configured automatically in `src/lib/axios.ts`
 
-## 📋 Routes
+### Endpoints
 
-### Public Routes
-- `/forms/:uuid` - Public patient form (Mobile-first)
+| Scope | Method | Endpoint | Description |
+|-------|--------|----------|-------------|
+| Public | GET | `/api/public/forms/{uuid}` | Get form template |
+| Public | POST | `/api/public/forms/{uuid}/submit` | Submit form |
+| Private | POST | `/api/auth/login` | Login |
+| Private | GET | `/api/submissions` | List submissions (paginated) |
+
+---
+
+## 📋 Application Routes
+
+### Public
+- `/forms/:uuid` - Patient form (mobile-first, dynamic theming)
 - `/login` - Login page
 
-### Protected Routes (Admin)
-- `/admin/dashboard` - Doctor dashboard with submissions list (Desktop-first)
+### Protected (Admin)
+- `/admin/dashboard` - Submissions list (desktop-first)
+
+---
 
 ## 🎨 Features
 
 ### Patient Form (`/forms/:uuid`)
 - ✅ Mobile-first responsive design
-- ✅ Dynamic theming based on clinic branding
-- ✅ Renders form from JSON schema
-- ✅ Patient information collection
-- ✅ Success feedback after submission
+- ✅ Dynamic theming (clinic branding colors)
+- ✅ JSON schema-based form rendering
+- ✅ Patient data collection (CPF, birth date, etc.)
+- ✅ Success feedback
 
 ### Doctor Dashboard (`/admin/dashboard`)
-- ✅ Desktop-optimized table layout
-- ✅ Pagination controls
+- ✅ Desktop-optimized table
+- ✅ Pagination
 - ✅ Status badges (Pending, Processed, Error, Sync Error)
-- ✅ Responsive design (hides columns on smaller screens)
+- ✅ Responsive (hides columns on mobile)
 
-### Authentication
-- ✅ Login with email, password, and clinic ID
-- ✅ Token storage in localStorage
-- ✅ Protected route wrapper
-- ✅ Auto-redirect on 401
+---
 
-## 🔐 Authentication Flow
+## 🚀 Deployment (GCP Cloud Run)
 
-1. User logs in with email, password, and **Clinic ID** (temporary for MVP)
-2. Backend returns JWT token
-3. Frontend stores token + clinic ID in localStorage
-4. Axios interceptor adds headers to all private requests
-5. On 401, user is redirected to login
+### Quick Deploy
 
-## 📊 API Endpoints Used
+```powershell
+.\deploy-frontend.ps1 -BackendUrl "https://your-api.a.run.app"
+```
 
-| Scope   | Method | Endpoint                          | Description                  |
-|---------|--------|-----------------------------------|------------------------------|
-| Public  | GET    | `/api/public/forms/{uuid}`        | Fetch form template          |
-| Public  | POST   | `/api/public/forms/{uuid}/submit` | Submit patient form          |
-| Private | POST   | `/api/auth/login`                 | Login                        |
-| Private | GET    | `/api/submissions`                | Get submissions (paginated)  |
+### Prerequisites
 
-## 🎨 Dynamic Theming
+- Docker Desktop running
+- Google Cloud SDK (`gcloud`) installed
+- Authenticated: `gcloud auth login`
+- Backend API already deployed
 
-The public form applies the clinic's primary color dynamically:
+### Local Docker Test
+
+```powershell
+# Build
+docker build --build-arg VITE_API_BASE_URL=http://localhost:8080 -t ctrls-web:test .
+
+# Run
+docker run -p 8080:8080 ctrls-web:test
+
+# Access: http://localhost:8080
+```
+
+### Deployment Documentation
+
+See [`docs/DEPLOY.md`](docs/DEPLOY.md) for complete deployment guide.
+
+---
+
+## 🧪 Development Tips
+
+### Test Public Form
+1. Get a form UUID from the backend
+2. Navigate to: `http://localhost:5173/forms/{uuid}`
+
+### Test Dashboard
+1. Login at: `http://localhost:5173/login`
+2. Required credentials:
+   - Email
+   - Password
+   - Clinic ID (UUID) - Temporary for MVP
+
+### Dynamic Theming
+
+The public form applies clinic branding dynamically:
 
 ```typescript
-// In PublicFormPage.tsx
+// Applies primaryColor from API to CSS variables
 useEffect(() => {
   if (template?.clinicBranding?.primaryColor) {
     const hsl = hexToHSL(template.clinicBranding.primaryColor);
@@ -130,76 +178,69 @@ useEffect(() => {
 }, [template]);
 ```
 
-This changes the header background and submit button to match the clinic's brand.
+---
 
-## 🧪 Development Tips
+## 🔐 Multi-Tenancy
 
-### Test Public Form
-1. Get a form UUID from the backend
-2. Navigate to: `http://localhost:3000/forms/{uuid}`
+⚠️ **Critical**: The `X-Clinic-ID` header is **required** for all private requests.
 
-### Test Dashboard
-1. Login with credentials: `http://localhost:3000/login`
-2. You'll need:
-   - Email
-   - Password
-   - Clinic ID (UUID)
+- Stored in `localStorage` after login
+- Automatically added by Axios interceptor
+- Without it, backend requests will fail
+
+---
 
 ## 📦 Key Dependencies
 
 ```json
 {
-  "react": "^18.x",
-  "react-dom": "^18.x",
-  "react-router-dom": "^6.x",
-  "@tanstack/react-query": "^5.x",
-  "axios": "^1.x",
-  "tailwindcss": "^3.x",
-  "lucide-react": "latest",
-  "clsx": "latest",
-  "tailwind-merge": "latest"
+  "react": "^19.2.0",
+  "react-router-dom": "^7.9.6",
+  "@tanstack/react-query": "^5.90.10",
+  "axios": "^1.13.2",
+  "tailwindcss": "^3.4.18",
+  "lucide-react": "^0.554.0"
 }
 ```
 
-## 🚨 Important Notes
+---
 
-### Multi-Tenancy
-- **X-Clinic-ID** header is CRITICAL for the backend
-- Without it, requests will fail
-- The clinic ID is stored in localStorage after login
+## 🐛 Troubleshooting
 
-### Form Schema Parsing
-- The `schemaJson` field is a **stringified JSON**
-- Must be parsed with `JSON.parse()` before rendering
-- Example structure:
-  ```json
-  [
-    {
-      "id": "q1",
-      "type": "text",
-      "label": "Question 1",
-      "required": true
-    }
-  ]
-  ```
+### TypeScript Error: `Property 'env' does not exist`
 
-### Submission Flow
-1. User fills patient info (name, CPF, birth date, etc.)
-2. User fills dynamic form fields
-3. Answers are stringified: `JSON.stringify(formAnswers)`
-4. Sent to backend as `SubmissionRequest`
+**Solution**: Restart TypeScript Server
+- VSCode: `Ctrl+Shift+P` → "TypeScript: Restart TS Server"
+- Or restart VSCode
 
-## 🎯 Next Steps (Phase 2+)
+### Docker Build Fails
 
-- [ ] Add form builder for doctors
-- [ ] Implement submission detail view
-- [ ] Add filtering and search in dashboard
-- [ ] Export submissions to PDF/Excel
-- [ ] Add real-time notifications
-- [ ] Implement doctor profile management
-- [ ] Add analytics dashboard
+**Check**:
+- Docker Desktop is running
+- `.dockerignore` exists
+- `npm run build` works locally
+
+### CORS Errors
+
+**Backend must allow** frontend origin:
+```java
+@CrossOrigin(origins = {"http://localhost:5173", "https://your-frontend.a.run.app"})
+```
+
+---
+
+## 📚 Documentation
+
+- [`docs/DEPLOY.md`](docs/DEPLOY.md) - Complete deployment guide
+- [`docs/COMMANDS.md`](docs/COMMANDS.md) - Useful commands reference
+
+---
 
 ## 📝 License
 
-Internal project for CTRLS-Forms medical SaaS.
+Internal project for CTRLS-Forms medical SaaS platform.
+
+---
+
+**Made with ❤️ using React + Vite + TypeScript + Tailwind CSS**
 

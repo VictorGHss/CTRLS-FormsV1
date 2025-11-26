@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 // Base API Configuration
-const BASE_URL = 'http://localhost:8080';
+// CRITICAL: Em produção, usa VITE_API_BASE_URL do build; em dev, usa localhost
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
 // Create axios instance
 export const api = axios.create({

@@ -51,15 +51,22 @@ public class SubmissionEventHandler {
 
     /**
      * Processa integração com Feegow em uma nova transação.
+     *
      * PROPAGATION.REQUIRES_NEW garante que mesmo que a transação pai falhe,
      * esta transação pode ser commitada independentemente.
+     *
+     * IMPORTANTE: Usa findByIdWithGraph() para carregar relacionamentos eagerly
+     * e evitar LazyInitializationException ao acessar submission.getTemplate().getClinic()
+     * em contexto assíncrono.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     void processSubmissionIntegration(UUID submissionId) {
-        Submission submission = submissionRepository.findById(submissionId)
+        // ✅ FIX: Usa findByIdWithGraph para carregar template + clinic eagerly
+        Submission submission = submissionRepository.findByIdWithGraph(submissionId)
                 .orElseThrow(() -> new IllegalStateException("Submissão não encontrada: " + submissionId));
 
         try {
+            // ✅ Agora submission.getTemplate().getClinic() está carregado (sem LazyInitializationException)
             String token = submission.getTemplate().getClinic().getFeegowApiToken();
 
             // 1. Resolver/Criar Paciente no Feegow
@@ -115,7 +122,8 @@ public class SubmissionEventHandler {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     void markAsError(UUID submissionId, String errorMessage) {
-        submissionRepository.findById(submissionId).ifPresent(submission -> {
+        // Usa findByIdWithGraph para consistência (mesmo que não precise acessar relacionamentos lazy aqui)
+        submissionRepository.findByIdWithGraph(submissionId).ifPresent(submission -> {
             submission.setStatus(SubmissionStatus.ERROR);
             submissionRepository.save(submission);
             log.error("Submissão marcada como ERROR: {} - Motivo: {}", submissionId, errorMessage);

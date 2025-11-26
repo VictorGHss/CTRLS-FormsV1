@@ -56,7 +56,7 @@ public class DevDataSeeder implements CommandLineRunner {
                 .crm("12345")
                 .uf("SP")
                 .bio("Cardiologista focado em medicina preventiva.")
-                .role(UserRole.DOCTOR)
+                .role(UserRole.DOCTOR)  // Necessário: builder não chama construtor protected
                 .clinics(new HashSet<>())
                 .build();
         doctor.getClinics().add(clinic);
